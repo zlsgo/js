@@ -1,15 +1,16 @@
-package js
+package js_test
 
 import (
 	"testing"
 
 	"github.com/sohaha/zlsgo"
 	"github.com/sohaha/zlsgo/zsync"
+	"github.com/zlsgo/js"
 )
 
 func TestJS(t *testing.T) {
 	tt := zlsgo.NewTest(t)
-	js := New()
+	js := js.New()
 	res, err := js.Run([]byte(`const m = 1;m`))
 	tt.NoError(err)
 	tt.Equal(int64(1), res)
@@ -17,7 +18,7 @@ func TestJS(t *testing.T) {
 
 func TestCommonjs(t *testing.T) {
 	tt := zlsgo.NewTest(t)
-	js := New()
+	js := js.New()
 	code, err := js.Transpile([]byte(`
 	const rand = Math.random().toString(36).slice(-8)
 	export default {rand}
