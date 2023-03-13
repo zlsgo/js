@@ -11,13 +11,13 @@ import (
 )
 
 type Option struct {
-	Dir             string
-	DisabledConsole bool
-	Timeout         time.Duration
 	Args            map[string]interface{}
 	Modules         map[string]require.ModuleLoader
 	CustomVm        func() *goja.Runtime
+	Dir             string
+	Timeout         time.Duration
 	MaxPrograms     uint
+	DisabledConsole bool
 }
 
 var log = zlog.New("[JS]")

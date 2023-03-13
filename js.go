@@ -12,10 +12,10 @@ import (
 )
 
 type VM struct {
-	timeout  time.Duration
 	runtime  sync.Pool
 	Program  *goja.Program
 	Programs *zcache.FastCache
+	timeout  time.Duration
 }
 
 func (vm *VM) GetRuntime() *goja.Runtime {
