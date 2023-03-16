@@ -1,12 +1,14 @@
 package js
 
 import (
+	"github.com/sohaha/zlsgo/ztype"
 	"sync"
 	"time"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/sohaha/zlsgo/zcache"
+	"github.com/sohaha/zlsgo/zfile"
 	"github.com/sohaha/zlsgo/zlog"
 )
 
@@ -18,6 +20,7 @@ type Option struct {
 	Timeout         time.Duration
 	MaxPrograms     uint
 	DisabledConsole bool
+	CompilerOptions ztype.Map
 }
 
 var log = zlog.New("[JS]")
@@ -28,6 +31,7 @@ func init() {
 
 func New(opt ...func(*Option)) *VM {
 	o := Option{
+		Dir:         zfile.RealPath("."),
 		Timeout:     time.Minute * 1,
 		MaxPrograms: 1 << 10,
 	}
@@ -39,8 +43,12 @@ func New(opt ...func(*Option)) *VM {
 		require.RegisterNativeModule(name, o.Modules[name])
 	}
 
+	timer := time.NewTimer(o.Timeout)
+	timer.Stop()
+
 	vm := &VM{
-		timeout: o.Timeout,
+		timer:  timer,
+		option: o,
 		Programs: zcache.NewFast(func(co *zcache.Option) {
 			m := o.MaxPrograms / 10
 			if m > 1 {

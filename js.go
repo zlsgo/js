@@ -15,7 +15,8 @@ type VM struct {
 	runtime  sync.Pool
 	Program  *goja.Program
 	Programs *zcache.FastCache
-	timeout  time.Duration
+	timer    *time.Timer
+	option   Option
 }
 
 func (vm *VM) GetRuntime() *goja.Runtime {
@@ -50,56 +51,73 @@ func (vm *VM) getProgram(code []byte, isExports bool) (p *goja.Program, err erro
 	return data.(*goja.Program), nil
 }
 
-func (vm *VM) Run(code []byte) (result interface{}, err error) {
+func (vm *VM) Run(code []byte, rendered ...func(*goja.Runtime) (goja.Value, error)) (result interface{}, err error) {
 	p, err := vm.getProgram(code, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return vm.RunProgram(p)
+	return vm.RunProgram(p, rendered...)
 }
 
-func (vm *VM) RunProgram(p *goja.Program, rendered ...func(*goja.Runtime) (interface{}, error)) (result interface{}, err error) {
+func (vm *VM) RunForMethod(code []byte, method string, args ...interface{}) (result interface{}, err error) {
+	return vm.Run(code, func(r *goja.Runtime) (goja.Value, error) {
+		fn, ok := goja.AssertFunction(r.Get(method))
+		if !ok {
+			return nil, errors.New("method " + method + " not found")
+		}
+
+		return vm.runMethod(r, fn, args)
+	})
+}
+
+func (vm *VM) RunProgram(p *goja.Program, rendered ...func(*goja.Runtime) (goja.Value, error)) (interface{}, error) {
 	if p == nil {
 		return nil, errors.New("program is nil")
 	}
+
 	r := vm.GetRuntime()
 	defer vm.PutRuntime(r)
 
-	ch := make(chan struct{})
-
-	var res goja.Value
-
-	go func() {
-		err = zerror.TryCatch(func() error {
-			res, err = r.RunProgram(p)
-			return err
-		})
-		ch <- struct{}{}
-	}()
-
-	select {
-	case <-ch:
-		if err != nil {
-			return
-		}
-
-		if len(rendered) == 0 {
-			result = res.Export()
-			return
-		}
-
-		for i := range rendered {
-			result, err = rendered[i](r)
-			if err != nil {
-				return
+	res, err := vm.timeout(r, func() (goja.Value, error) {
+		value, err := r.RunProgram(p)
+		if err == nil {
+			for i := range rendered {
+				value, err = rendered[i](r)
 			}
 		}
+		return value, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.Export(), nil
+}
 
-		return
-	case <-time.After(vm.timeout):
-		r.Interrupt("timeout")
-		r.ClearInterrupt()
-		return nil, errors.New("timeout: " + vm.timeout.String())
+func (vm *VM) timeout(r *goja.Runtime, run func() (goja.Value, error)) (goja.Value, error) {
+
+	ch := make(chan error)
+	resCh := make(chan goja.Value)
+
+	vm.timer.Reset(vm.option.Timeout)
+	go func() {
+		ch <- zerror.TryCatch(func() error {
+			res, err := run()
+			if err == nil {
+				resCh <- res
+			}
+			return err
+		})
+	}()
+
+	for {
+		select {
+		case res := <-resCh:
+			return res, nil
+		case err := <-ch:
+			return nil, err
+		case <-vm.timer.C:
+			r.Interrupt("timeout")
+		}
 	}
 }
