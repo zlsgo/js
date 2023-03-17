@@ -28,13 +28,15 @@ func (vm *VM) PutRuntime(r *goja.Runtime) {
 }
 
 func (vm *VM) getProgram(code []byte, isExports bool) (p *goja.Program, err error) {
-	name := zstring.Md5Byte(code)
+	codeStr := zstring.Bytes2String(code)
+	name := codeStr
 	if isExports {
-		name = "e_" + name
+		name = "e::" + name
 	}
+
 	data, ok := vm.Programs.ProvideGet(name, func() (interface{}, bool) {
 		var p *goja.Program
-		codeStr := zstring.Bytes2String(code)
+
 		if isExports {
 			codeStr = "var exports = {};(function (){" + codeStr + "})()"
 		}
@@ -44,7 +46,11 @@ func (vm *VM) getProgram(code []byte, isExports bool) (p *goja.Program, err erro
 		}
 		return p, true
 	})
+
 	if !ok {
+		if err != nil {
+			return nil, err
+		}
 		return nil, errors.New("compile not existent")
 	}
 
