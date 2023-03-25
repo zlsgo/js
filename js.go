@@ -107,6 +107,7 @@ func (vm *VM) timeout(r *goja.Runtime, run func() (goja.Value, error)) (goja.Val
 
 	vm.timer.Reset(vm.option.Timeout)
 	go func() {
+		vm.timer.Stop()
 		ch <- zerror.TryCatch(func() error {
 			res, err := run()
 			if err == nil {
