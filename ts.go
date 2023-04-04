@@ -3,7 +3,6 @@ package js
 import (
 	_ "embed"
 
-	"github.com/dop251/goja"
 	"github.com/sohaha/zlsgo/zfile"
 	"github.com/sohaha/zlsgo/zjson"
 	"github.com/sohaha/zlsgo/zstring"
@@ -13,20 +12,13 @@ import (
 // ts v4.9.3.js
 
 //go:embed ts.js
-var tsTranspile string
+var tsTranspile []byte
 
 var tsVm *VM
 
 func init() {
 	tsVm = New(func(o *Option) {
-		o.CustomVm = func() *goja.Runtime {
-			vm := goja.New()
-			vm.RunString(tsTranspile)
-			vm.Set("DecodeCode", func(code string) (string, error) {
-				return zstring.Base64DecodeString(code)
-			})
-			return vm
-		}
+		o.Inject = tsTranspile
 	})
 }
 
@@ -35,7 +27,7 @@ func Transpile(code []byte, compilerOptions ztype.Map) ([]byte, error) {
 	for k := range compilerOptions {
 		zjson.Set(compiler, k, compilerOptions[k])
 	}
-	s := `ts.transpileModule(DecodeCode("` + zstring.Base64EncodeString(zstring.Bytes2String(code)) + `"), {
+	s := `ts.transpileModule(atob("` + zstring.Base64EncodeString(zstring.Bytes2String(code)) + `"), {
 		"compilerOptions": ` + compiler + `,
 		})`
 

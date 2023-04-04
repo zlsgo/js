@@ -9,6 +9,7 @@ import (
 	"github.com/sohaha/zlsgo/zcache"
 	"github.com/sohaha/zlsgo/zerror"
 	"github.com/sohaha/zlsgo/zstring"
+	"github.com/sohaha/zlsgo/ztype"
 )
 
 type VM struct {
@@ -57,13 +58,17 @@ func (vm *VM) getProgram(code []byte, isExports bool) (p *goja.Program, err erro
 	return data.(*goja.Program), nil
 }
 
-func (vm *VM) Run(code []byte, rendered ...func(*goja.Runtime) (goja.Value, error)) (result interface{}, err error) {
+func (vm *VM) Run(code []byte, rendered ...func(*goja.Runtime) (goja.Value, error)) (result ztype.Type, err error) {
 	p, err := vm.getProgram(code, false)
 	if err != nil {
-		return nil, err
+		return ztype.Type{}, err
 	}
 
 	return vm.RunProgram(p, rendered...)
+}
+
+func (vm *VM) RunString(code string, rendered ...func(*goja.Runtime) (goja.Value, error)) (result ztype.Type, err error) {
+	return vm.Run(zstring.String2Bytes(code), rendered...)
 }
 
 func (vm *VM) RunForMethod(code []byte, method string, args ...interface{}) (result interface{}, err error) {
@@ -77,9 +82,9 @@ func (vm *VM) RunForMethod(code []byte, method string, args ...interface{}) (res
 	})
 }
 
-func (vm *VM) RunProgram(p *goja.Program, rendered ...func(*goja.Runtime) (goja.Value, error)) (interface{}, error) {
+func (vm *VM) RunProgram(p *goja.Program, rendered ...func(*goja.Runtime) (goja.Value, error)) (ztype.Type, error) {
 	if p == nil {
-		return nil, errors.New("program is nil")
+		return ztype.Type{}, errors.New("program is nil")
 	}
 
 	r := vm.GetRuntime()
@@ -95,9 +100,9 @@ func (vm *VM) RunProgram(p *goja.Program, rendered ...func(*goja.Runtime) (goja.
 		return value, err
 	})
 	if err != nil {
-		return nil, err
+		return ztype.Type{}, err
 	}
-	return res.Export(), nil
+	return ztype.New(res.Export()), nil
 }
 
 func (vm *VM) timeout(r *goja.Runtime, run func() (goja.Value, error)) (goja.Value, error) {

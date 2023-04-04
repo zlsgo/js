@@ -1,11 +1,14 @@
 package js
 
 import (
-	"github.com/sohaha/zlsgo/ztype"
 	"sync"
 	"time"
 
+	"github.com/sohaha/zlsgo/zstring"
+	"github.com/sohaha/zlsgo/ztype"
+
 	"github.com/dop251/goja"
+	"github.com/dop251/goja/parser"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/sohaha/zlsgo/zcache"
 	"github.com/sohaha/zlsgo/zfile"
@@ -13,14 +16,16 @@ import (
 )
 
 type Option struct {
-	Args            map[string]interface{}
-	Modules         map[string]require.ModuleLoader
-	CustomVm        func() *goja.Runtime
-	Dir             string
-	Timeout         time.Duration
-	MaxPrograms     uint
-	DisabledConsole bool
-	CompilerOptions ztype.Map
+	Args             map[string]interface{}
+	Modules          map[string]require.ModuleLoader
+	CustomVm         func() *goja.Runtime
+	CompilerOptions  ztype.Map
+	Dir              string
+	Inject           []byte
+	Timeout          time.Duration
+	MaxPrograms      uint
+	DisabledConsole  bool
+	ParserSourceMaps bool
 }
 
 var log = zlog.New("[JS]")
@@ -59,18 +64,44 @@ func New(opt ...func(*Option)) *VM {
 		}),
 		runtime: sync.Pool{
 			New: func() interface{} {
+
 				var opts []require.Option
 				if o.Dir != "" {
 					opts = append(opts, require.WithLoader(sourceLoader(o.Dir)))
 				}
 
+				var vm *goja.Runtime
 				if o.CustomVm != nil {
-					return o.CustomVm()
+					vm = o.CustomVm()
+				} else {
+					vm = goja.New()
 				}
 
-				vm := goja.New()
+				var parserOpts []parser.Option
+				if !o.ParserSourceMaps {
+					parserOpts = append(parserOpts, parser.WithDisableSourceMaps)
+				}
+
+				if len(parserOpts) > 0 {
+					vm.SetParserOptions(parserOpts...)
+				}
+
 				r := require.NewRegistry(opts...)
 				r.Enable(vm)
+
+				self := vm.GlobalObject()
+				vm.Set("self", self)
+
+				vm.Set("atob", func(code string) string {
+					raw, err := zstring.Base64DecodeString(code)
+					if err != nil {
+						panic(err)
+					}
+					return raw
+				})
+				vm.Set("btoa", func(code string) string {
+					return zstring.Base64EncodeString(code)
+				})
 
 				if !o.DisabledConsole {
 					clog := vm.NewObject()
@@ -82,6 +113,10 @@ func New(opt ...func(*Option)) *VM {
 
 				for k, v := range o.Args {
 					vm.Set(k, v)
+				}
+
+				if o.Inject != nil {
+					zlog.Debug(vm.RunString(zstring.Bytes2String(o.Inject)))
 				}
 
 				return vm
