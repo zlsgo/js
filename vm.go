@@ -116,7 +116,7 @@ func New(opt ...func(*Option)) *VM {
 				}
 
 				if o.Inject != nil {
-					zlog.Debug(vm.RunString(zstring.Bytes2String(o.Inject)))
+					_, _ = vm.RunString(zstring.Bytes2String(o.Inject))
 				}
 
 				return vm
