@@ -32,7 +32,7 @@ func (vm *VM) getProgram(code []byte, isExports bool) (p *goja.Program, err erro
 	codeStr := zstring.Bytes2String(code)
 	name := codeStr
 	if isExports {
-		name = "e::" + name
+		name = zstring.Md5("e::" + name)
 	}
 
 	data, ok := vm.Programs.ProvideGet(name, func() (interface{}, bool) {
@@ -71,7 +71,7 @@ func (vm *VM) RunString(code string, rendered ...func(*goja.Runtime) (goja.Value
 	return vm.Run(zstring.String2Bytes(code), rendered...)
 }
 
-func (vm *VM) RunForMethod(code []byte, method string, args ...interface{}) (result interface{}, err error) {
+func (vm *VM) RunForMethod(code []byte, method string, args ...interface{}) (result ztype.Type, err error) {
 	return vm.Run(code, func(r *goja.Runtime) (goja.Value, error) {
 		fn, ok := goja.AssertFunction(r.Get(method))
 		if !ok {
@@ -100,19 +100,19 @@ func (vm *VM) RunProgram(p *goja.Program, rendered ...func(*goja.Runtime) (goja.
 		return value, err
 	})
 	if err != nil {
-		return ztype.Type{}, err
+		return ztype.New(nil), err
 	}
 	return ztype.New(res.Export()), nil
 }
 
 func (vm *VM) timeout(r *goja.Runtime, run func() (goja.Value, error)) (goja.Value, error) {
-
 	ch := make(chan error)
 	resCh := make(chan goja.Value)
 
 	vm.timer.Reset(vm.option.Timeout)
+	defer vm.timer.Stop()
+
 	go func() {
-		vm.timer.Stop()
 		ch <- zerror.TryCatch(func() error {
 			res, err := run()
 			if err == nil {
@@ -122,14 +122,13 @@ func (vm *VM) timeout(r *goja.Runtime, run func() (goja.Value, error)) (goja.Val
 		})
 	}()
 
-	for {
-		select {
-		case res := <-resCh:
-			return res, nil
-		case err := <-ch:
-			return nil, err
-		case <-vm.timer.C:
-			r.Interrupt("timeout")
-		}
+	select {
+	case res := <-resCh:
+		return res, nil
+	case err := <-ch:
+		return nil, err
+	case <-vm.timer.C:
+		r.Interrupt("timeout")
+		return nil, errors.New("timeout")
 	}
 }

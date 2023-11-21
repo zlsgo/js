@@ -10,8 +10,7 @@ import (
 
 func sourceLoader(dir string) func(string) ([]byte, error) {
 	return func(filename string) ([]byte, error) {
-		ext := filepath.Ext(filename)
-		data, err := os.ReadFile(zfile.RealPath(filename))
+		data, err := os.ReadFile(filename)
 		if err != nil {
 			fullPath := zfile.RealPath(dir, true) + filename
 			for _, v := range []string{fullPath, fullPath + ".ts"} {
@@ -20,13 +19,13 @@ func sourceLoader(dir string) func(string) ([]byte, error) {
 					break
 				}
 			}
-
 		}
 
 		if err != nil {
 			return nil, require.ModuleFileDoesNotExistError
 		}
 
+		ext := filepath.Ext(filename)
 		if ext == ".ts" || ext == "" {
 			data, err = Transpile(data, nil)
 		}

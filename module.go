@@ -2,14 +2,15 @@ package js
 
 import (
 	"errors"
+
 	"github.com/dop251/goja"
 	"github.com/sohaha/zlsgo/ztype"
 )
 
-func (vm *VM) RunModule(code []byte, rendered ...func(*goja.Runtime) (goja.Value, error)) (result interface{}, err error) {
+func (vm *VM) RunModule(code []byte, rendered ...func(*goja.Runtime) (goja.Value, error)) (result ztype.Type, err error) {
 	p, err := vm.getProgram(code, true)
 	if err != nil {
-		return nil, err
+		return ztype.New(nil), err
 	}
 
 	return vm.RunProgram(p, func(r *goja.Runtime) (result goja.Value, err error) {

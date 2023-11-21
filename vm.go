@@ -54,7 +54,7 @@ func New(opt ...func(*Option)) *VM {
 	vm := &VM{
 		timer:  timer,
 		option: o,
-		Programs: zcache.NewFast(func(co *zcache.Option) {
+		Programs: zcache.NewFast(func(co *zcache.Options) {
 			m := o.MaxPrograms / 10
 			if m > 1 {
 				co.Bucket = uint16(m)
@@ -64,7 +64,6 @@ func New(opt ...func(*Option)) *VM {
 		}),
 		runtime: sync.Pool{
 			New: func() interface{} {
-
 				var opts []require.Option
 				if o.Dir != "" {
 					opts = append(opts, require.WithLoader(sourceLoader(o.Dir)))
